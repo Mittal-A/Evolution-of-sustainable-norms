@@ -13,7 +13,7 @@ breed [individuals individual]
 
 
 
-;; Globals specified in the Interface
+;; Controls specified in the Interface
 ;; - n-organisations
 ;; - threshold
 ;; - subsidies
@@ -58,6 +58,7 @@ organisations-own [
   legacy-infrastructure
   threshold-factor
   n-levels
+  investment-decision?
 ]
 
 
@@ -111,7 +112,7 @@ to setup-organisations
   create-ordered-organisations n-organisations
   [
     ;; TODO: Respecify normative-motiavtion based on the values of individuals or groups
-    set n-people random 1000 + 1
+    set n-people random 500 + 1
     set n-groups round (n-people / N-INDIVIDUALS-PER-GROUP)
     ;; set normative-motivation random 100
     set brand item 1 one-of brands
@@ -119,74 +120,90 @@ to setup-organisations
     let x item 0 filter [ i -> item 0 i = external-competition] external-competition-list
     set prosociality item 1 x
     set sustainable-infrastructure brand
-    set legacy-infrastructure 1 - sustainable-infrastructure
+    set legacy-infrastructure (1 - sustainable-infrastructure)
     set threshold-factor random-float 1
     select-organisational-structure
-
-
-
+    print organisational-structure
+    set investment-decision? False ;; We assume that organization start with an unsustainable investment decision
   ]
 end
 
+;;
 to setup-organisational-structure-distribution
   set n-hierarchical round (percentage-hierarchical * n-organisations)
   set n-intermediate round (percentage-intermediate * n-organisations)
   set n-flat round (percentage-flat * n-organisations)
 end
 
+
+;;
 to select-organisational-structure
-  let t random 3
-  ifelse n-hierarchical >= 1 and t = 2 [
-    ask organisations[
-      set organisational-structure 2
-      set n-levels n-groups
-    ]
+  ifelse n-hierarchical >= 1 [
+    set organisational-structure 2
+    set n-levels n-groups
     set n-hierarchical n-hierarchical - 1
   ]
   [
-    ifelse n-intermediate >= 1 and t = 1 [
-      ask organisations[
+    ifelse n-intermediate >= 1 [
       set organisational-structure 1
-      set n-levels round n-groups / 2
-      ]
+      ;set n-levels round n-groups / 2 ;; start with subtracting 1 from n groups, then substract 2, then 3, and so on to find the number of levels
+      calculate-levels-intermediate
       set n-intermediate n-intermediate - 1
     ]
     [
-      if n-flat >= 1 and t = 0 [
-        ask organisations[
-          set organisational-structure 0
-          set n-levels 1
-        ]
+      if n-flat >= 1 [
+        set organisational-structure 0
+        set n-levels 1
         set n-flat n-flat - 1
+      ]
     ]
-    ]
-   ]
+  ]
 end
 
-
+to calculate-levels-intermediate
+  let numberoflevels 0
+  let groups-at-level 1
+  let number-of-groups-to-be-assigned n-groups
+  let stoploop? False
+  loop [ ; in every iteration, subtract 1 from the number of groups to get groups left to be assigned, and add 1 to the number of levels
+    if stoploop? = True [stop]
+    set number-of-groups-to-be-assigned max list (number-of-groups-to-be-assigned - groups-at-level) 0
+    set groups-at-level (groups-at-level + 1) ; groups at next level
+    set numberoflevels (numberoflevels + 1)   ; increment number of levels
+    if (number-of-groups-to-be-assigned < groups-at-level) or (number-of-groups-to-be-assigned = 0)
+    [
+      set stoploop? True
+      set n-levels numberoflevels
+    ]
+  ]
+end
 
 ;; -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ;; 2. Groups procedures
 ;; -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 to setup-groups
-  let n [0]
-  let m [0]
 
-  ask organisations[
-    set n insert-item 1 n n-groups
-    set m insert-item 1 m who
-  ]
-
-  foreach n[
-    i ->
-    if i != 0 [
-      create-groups i[
-      ]
+  foreach sort-on [who] organisations [                           ;;Iterate over all organisations
+    the-organisation ->                            ;;for each ogranisation in the agent set
+    create-groups ([n-groups] of the-organisation) ;;create groups that have properties inherited from the organisation
+    [
+      ;set group-level calculate-group-level ([n-groups] of the-organisation, )
+      ;if group-level ; if the level of the group is in the top 30%, their normative and instrumental motivations are exactly that of organisation
+      ; if the level of the group is in the middle, then it's 80 - 90% of the organisation
+      ; if the level of the group is low, then it's 50-60% of the organisation
+      ;set group-instrumental-motivation [instrumental-motivation] of the-organisation
+      ;set group-normative-motivation [normative-motivation] of the-organisation
+      ;set n-group-members N-INDIVIDUALS-PER-GROUP
+      ;set organisation-id [who] of the-organisation
     ]
   ]
+
 end
 
+to calculate-group-level
+  ;start with total number of groups and the heirarchy of the organisation
 
+end
 
 ;; -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ;; 3. Individuals procedures
@@ -202,6 +219,7 @@ end
 ;; -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 to setup-globals
   set N-INDIVIDUALS-PER-GROUP 25
+  set market_trend random-float 1 ;;should this number be initialized based on the intitial investment decisions of the organizations?
 end
 
 to setup-additional-variables
@@ -209,7 +227,6 @@ to setup-additional-variables
   set internal-competition-list [["low" 0.8] ["medium" 1.0] ["high" 1.2]]
   set brands [["non-sustainable" 0] ["marginally-sustainable" 0.25] ["moderately-sustainable" 0.5] ["quite-sustainable" 0.75] ["sustainable corresponding" 1]]
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 441
@@ -247,7 +264,7 @@ n-organisations
 n-organisations
 3
 10
-3.0
+8.0
 1
 1
 NIL
